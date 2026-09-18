@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hookguard
+      POSTGRES_PASSWORD: hookguard
+      POSTGRES_DB: hookguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - hookguard-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hookguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://hookguard:hookguard@postgres:5432/hookguard
+      REDIS_URL: redis://redis:6379
+      API_KEY: ${API_KEY:-change-me}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change-me-too}
+      MAX_ATTEMPTS: 5
+      BACKOFF_BASE_MS: 1000
+    ports:
+      - "3000:3000"
+
+volumes:
+  hookguard-postgres:
